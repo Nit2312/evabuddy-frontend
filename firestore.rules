@@ -1,0 +1,52 @@
+rules_version = '2';
+// IMPORTANT: On delete, request.resource is null. Never use request.resource in allow delete.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Each user can only read/write their own profile doc
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Chat sessions: only owner; update cannot change userId; delete uses resource only
+    match /chatSessions/{sessionId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow update: if request.auth != null && request.auth.uid == resource.data.userId && request.resource.data.userId == resource.data.userId;
+    }
+
+    // Chat messages: only owner; update cannot change userId; delete uses resource only
+    match /chatMessages/{messageId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow update: if request.auth != null && request.auth.uid == resource.data.userId && request.resource.data.userId == resource.data.userId;
+    }
+
+    // Projects: only owner; update cannot change userId; delete uses resource only
+    match /projects/{projectId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow update: if request.auth != null && request.auth.uid == resource.data.userId && request.resource.data.userId == resource.data.userId;
+    }
+
+    // Tasks: read/write if owner of task or project; update cannot reassign userId; delete uses resource only (request.resource is null on delete)
+    match /tasks/{taskId} {
+      allow read: if request.auth != null && (
+        resource.data.userId == request.auth.uid ||
+        (('projectId' in resource.data) && exists(/databases/$(database)/documents/projects/$(resource.data.projectId)) && get(/databases/$(database)/documents/projects/$(resource.data.projectId)).data.userId == request.auth.uid)
+      );
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && (
+        resource.data.userId == request.auth.uid ||
+        (('projectId' in resource.data) && exists(/databases/$(database)/documents/projects/$(resource.data.projectId)) && get(/databases/$(database)/documents/projects/$(resource.data.projectId)).data.userId == request.auth.uid)
+      );
+      allow update: if request.auth != null && (
+        resource.data.userId == request.auth.uid ||
+        (('projectId' in resource.data) && exists(/databases/$(database)/documents/projects/$(resource.data.projectId)) && get(/databases/$(database)/documents/projects/$(resource.data.projectId)).data.userId == request.auth.uid)
+      ) && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId);
+    }
+  }
+}
