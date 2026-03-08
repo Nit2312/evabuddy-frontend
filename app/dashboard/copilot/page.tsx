@@ -60,10 +60,32 @@ function CopilotInner() {
   }, [activeSessionId, user, scrollToBottom]);
 
   useEffect(() => {
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5001';
-    api.health()
-      .then(() => setBackendStatus('online'))
-      .catch(() => setBackendStatus('offline'));
+    let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const maxAttempts = 4;
+    const delayMs = 2000;
+
+    const check = (attempt: number) => {
+      if (cancelled) return;
+      api
+        .health()
+        .then(() => {
+          if (!cancelled) setBackendStatus('online');
+        })
+        .catch(() => {
+          if (cancelled) return;
+          if (attempt < maxAttempts) {
+            timeoutId = setTimeout(() => check(attempt + 1), delayMs);
+          } else {
+            setBackendStatus('offline');
+          }
+        });
+    };
+    check(0);
+    return () => {
+      cancelled = true;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, []);
 
   useEffect(() => {
