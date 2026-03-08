@@ -32,12 +32,16 @@ function CopilotInner() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
-  const [backendStatus, setBackendStatus] = useState<'unknown' | 'online' | 'offline'>('unknown');
+  const [backendStatus, setBackendStatus] = useState<'connecting' | 'initializing' | 'online' | 'offline'>('connecting');
+  const [showReadyToast, setShowReadyToast] = useState(false);
   const [openSources, setOpenSources] = useState<string | null>(null);
   const [sessionsPanelCollapsed, setSessionsPanelCollapsed] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hasSentMessage = useRef(false);
+  const previousBackendStatus = useRef<'connecting' | 'initializing' | 'online' | 'offline'>('connecting');
+
+  const isBackendReady = backendStatus === 'online';
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
@@ -61,32 +65,41 @@ function CopilotInner() {
 
   useEffect(() => {
     let cancelled = false;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    const maxAttempts = 4;
-    const delayMs = 2000;
 
-    const check = (attempt: number) => {
-      if (cancelled) return;
-      api
-        .health()
-        .then(() => {
-          if (!cancelled) setBackendStatus('online');
-        })
-        .catch(() => {
-          if (cancelled) return;
-          if (attempt < maxAttempts) {
-            timeoutId = setTimeout(() => check(attempt + 1), delayMs);
-          } else {
-            setBackendStatus('offline');
-          }
-        });
+    const check = async () => {
+      try {
+        const health = await api.health();
+        if (cancelled) return;
+        setBackendStatus(health.initialized ? 'online' : 'initializing');
+      } catch {
+        if (!cancelled) setBackendStatus('offline');
+      }
     };
-    check(0);
+
+    check();
+    const intervalId = setInterval(check, 3000);
+
     return () => {
       cancelled = true;
-      if (timeoutId) clearTimeout(timeoutId);
+      clearInterval(intervalId);
     };
   }, []);
+
+  useEffect(() => {
+    const prev = previousBackendStatus.current;
+    previousBackendStatus.current = backendStatus;
+
+    if (backendStatus !== 'online') {
+      setShowReadyToast(false);
+      return;
+    }
+
+    if (prev !== 'online') {
+      setShowReadyToast(true);
+      const timeoutId = setTimeout(() => setShowReadyToast(false), 2600);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [backendStatus]);
 
   useEffect(() => {
     const ta = textareaRef.current;
@@ -116,7 +129,7 @@ function CopilotInner() {
 
   const sendMessage = async (text?: string) => {
     const msg = (text ?? input).trim();
-    if (!msg || sending || !user) return;
+    if (!msg || sending || !user || !isBackendReady) return;
     setInput('');
     setSending(true);
     hasSentMessage.current = true;
@@ -156,25 +169,28 @@ function CopilotInner() {
   ];
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
-      <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border bg-background px-4">
-        <div className="flex items-center gap-3">
-          <h1 className="text-lg font-semibold">AI Copilot</h1>
-          <span
+    <div className="relative flex h-full flex-col overflow-hidden">
+      <AnimatePresence>
+        {(backendStatus !== 'online' || showReadyToast) && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
             className={cn(
-              'rounded-full px-2.5 py-0.5 text-xs font-semibold',
-              backendStatus === 'online' && 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400',
-              backendStatus === 'offline' && 'bg-red-500/20 text-red-600 dark:text-red-400',
-              backendStatus === 'unknown' && 'bg-muted text-muted-foreground'
+              'pointer-events-none absolute right-4 top-4 z-30 rounded-lg border px-3 py-2 text-xs font-medium shadow-md backdrop-blur',
+              backendStatus === 'offline' && 'border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-300',
+              (backendStatus === 'connecting' || backendStatus === 'initializing') &&
+                'border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+              backendStatus === 'online' && 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
             )}
           >
-            {backendStatus === 'online' ? '● Online' : backendStatus === 'offline' ? '● Offline' : '● Connecting...'}
-          </span>
-        </div>
-        <Button variant="secondary" size="sm" onClick={startNewSession}>
-          <Plus className="mr-1 h-4 w-4" /> New Chat
-        </Button>
-      </header>
+            {backendStatus === 'connecting' && 'Connecting to backend...'}
+            {backendStatus === 'initializing' && 'System is initializing. Please wait...'}
+            {backendStatus === 'offline' && 'Backend is offline. Retrying connection...'}
+            {backendStatus === 'online' && 'System is live. You can ask questions now.'}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="flex min-h-0 flex-1">
         <motion.aside
@@ -255,7 +271,12 @@ function CopilotInner() {
         </motion.aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex-1 overflow-y-auto p-4 md:p-6">
+          <div
+            className={cn(
+              'flex-1 overflow-y-auto transition-[padding] duration-200',
+              sessionsPanelCollapsed ? 'px-1 py-2 md:px-2 md:py-3' : 'p-4 md:p-6'
+            )}
+          >
             {!hasSentMessage.current && messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <motion.div
@@ -276,6 +297,7 @@ function CopilotInner() {
                       variant="outline"
                       size="sm"
                       className="rounded-full"
+                      disabled={!isBackendReady || sending}
                       onClick={() => sendMessage(s)}
                     >
                       {s}
@@ -284,7 +306,12 @@ function CopilotInner() {
                 </div>
               </div>
             ) : (
-              <div className="mx-auto flex max-w-3xl flex-col gap-6">
+              <div
+                className={cn(
+                  'flex w-full flex-col gap-6 transition-[max-width,margin] duration-200',
+                  sessionsPanelCollapsed ? 'mx-0 max-w-none' : 'mx-auto max-w-3xl'
+                )}
+              >
                 {messages.map((msg) => (
                   <MessageBubble
                     key={msg.id}
@@ -311,22 +338,36 @@ function CopilotInner() {
             )}
           </div>
 
-          <div className="shrink-0 border-t border-border p-4">
-            <div className="mx-auto flex max-w-3xl gap-2 rounded-xl border border-input bg-background px-4 py-2 shadow-sm focus-within:ring-2 focus-within:ring-ring">
+          <div
+            className={cn(
+              'shrink-0 border-t border-border transition-[padding] duration-200',
+              sessionsPanelCollapsed ? 'px-1 py-2 md:px-2 md:py-3' : 'p-4'
+            )}
+          >
+            <div
+              className={cn(
+                'flex w-full gap-2 rounded-xl border border-input bg-background px-4 py-2 shadow-sm focus-within:ring-2 focus-within:ring-ring transition-[max-width,margin] duration-200',
+                sessionsPanelCollapsed ? 'mx-0 max-w-none' : 'mx-auto max-w-3xl'
+              )}
+            >
               <textarea
                 ref={textareaRef}
-                placeholder="Ask anything about elevator procedures..."
+                placeholder={
+                  isBackendReady
+                    ? 'Ask anything about elevator procedures...'
+                    : 'System is initializing. Query input is disabled until backend is live.'
+                }
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 rows={1}
-                disabled={sending}
+                disabled={sending || !isBackendReady}
                 className="min-h-[24px] flex-1 resize-none bg-transparent py-2 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
               />
               <Button
                 size="icon"
                 onClick={() => sendMessage()}
-                disabled={!input.trim() || sending}
+                disabled={!input.trim() || sending || !isBackendReady}
                 aria-label="Send"
                 className="shrink-0"
               >
