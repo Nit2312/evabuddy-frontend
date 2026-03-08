@@ -397,21 +397,6 @@ function MessageBubble({
           </div>
         )}
 
-        {msg.role === 'assistant' && metrics && (
-          <div className="flex flex-wrap gap-1.5">
-            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-              Precision: {metrics.precision_at_k?.toFixed(2)}
-            </span>
-            {(metrics.recall_at_k !== null && metrics.recall_at_k !== undefined) && (
-              <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
-                Recall: {metrics.recall_at_k?.toFixed(2)}
-              </span>
-            )}
-            <span className="rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-600 dark:text-blue-400">
-              k={metrics.k}
-            </span>
-          </div>
-        )}
       </div>
     </motion.div>
   );
