@@ -81,7 +81,7 @@ export default function ProjectDetailPage() {
 
   return (
     <div className="space-y-6 p-4 md:p-6 lg:p-8">
-      <div className="flex items-center gap-2 text-sm">
+      <div className="flex flex-wrap items-center gap-2 text-sm">
         <Button variant="ghost" size="sm" asChild>
           <Link href="/dashboard/projects" className="text-muted-foreground hover:text-foreground">
             <ChevronLeft className="mr-1 h-4 w-4" /> Projects
@@ -92,7 +92,7 @@ export default function ProjectDetailPage() {
       </div>
 
       <Card className="overflow-hidden rounded-xl">
-        <div className="flex gap-4 p-6">
+        <div className="flex gap-3 p-4 sm:gap-4 sm:p-6">
           <div className="h-full w-1 shrink-0 rounded-full" style={{ backgroundColor: project.color }} />
           <div className="min-w-0 flex-1">
             <h2 className="text-xl font-bold">{project.name}</h2>
@@ -128,7 +128,7 @@ export default function ProjectDetailPage() {
         )}
       </Card>
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="font-semibold">Tasks</h3>
         <Button variant="secondary" size="sm" onClick={() => setShowInput(!showInput)}>
           <Plus className="mr-1 h-4 w-4" /> Add Task
@@ -136,7 +136,7 @@ export default function ProjectDetailPage() {
       </div>
 
       {showInput && (
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <Input
             placeholder="Task title..."
             value={newTaskTitle}
@@ -148,7 +148,11 @@ export default function ProjectDetailPage() {
             className="rounded-lg"
             autoFocus
           />
-          <Button onClick={handleAddTask} disabled={addingTask || !newTaskTitle.trim()}>
+          <Button
+            onClick={handleAddTask}
+            disabled={addingTask || !newTaskTitle.trim()}
+            className="sm:w-auto"
+          >
             {addingTask ? '...' : 'Add'}
           </Button>
         </div>
@@ -167,7 +171,7 @@ export default function ProjectDetailPage() {
           {tasks.map((task) => (
             <li
               key={task.id}
-              className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 transition-colors hover:border-border/80"
+              className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card px-3 py-3 transition-colors hover:border-border/80 sm:flex-nowrap sm:gap-3 sm:px-4"
             >
               <button
                 type="button"
@@ -199,7 +203,7 @@ export default function ProjectDetailPage() {
                 onClick={() => handleDeleteTask(task.id)}
                 title="Delete task"
                 aria-label="Delete task"
-                className="text-muted-foreground hover:text-destructive"
+                className="ml-auto text-muted-foreground hover:text-destructive sm:ml-0"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>

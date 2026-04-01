@@ -17,7 +17,6 @@ import {
   LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: Zap, exact: true },
@@ -29,11 +28,18 @@ const navItems = [
 const sidebarWidth = 240;
 const sidebarCollapsedWidth = 64;
 
-export default function Sidebar() {
+interface SidebarProps {
+  className?: string;
+  onNavigate?: () => void;
+  showCollapseToggle?: boolean;
+}
+
+export default function Sidebar({ className, onNavigate, showCollapseToggle = true }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const router = useRouter();
+  const isCollapsed = showCollapseToggle && collapsed;
 
   const isActive = (href: string, exact?: boolean) =>
     exact ? pathname === href : pathname.startsWith(href);
@@ -52,9 +58,12 @@ export default function Sidebar() {
 
   return (
     <motion.aside
-      className="flex shrink-0 flex-col border-r border-border bg-card overflow-hidden relative"
+      className={cn(
+        'flex shrink-0 flex-col border-r border-border bg-card overflow-hidden relative',
+        className
+      )}
       initial={false}
-      animate={{ width: collapsed ? sidebarCollapsedWidth : sidebarWidth }}
+      animate={{ width: isCollapsed ? sidebarCollapsedWidth : sidebarWidth }}
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
     >
       <div className="flex h-14 items-center gap-2 border-b border-border px-3">
@@ -62,7 +71,7 @@ export default function Sidebar() {
           <Rocket className="h-4 w-4" />
         </div>
         <AnimatePresence initial={false}>
-          {!collapsed && (
+          {!isCollapsed && (
             <motion.span
               className="font-semibold text-sm truncate"
               initial={{ opacity: 0, width: 0 }}
@@ -79,7 +88,7 @@ export default function Sidebar() {
       <nav className="flex-1 overflow-y-auto p-2">
         <div className="mb-1 px-2 py-1.5">
           <AnimatePresence initial={false}>
-            {!collapsed && (
+            {!isCollapsed && (
               <motion.span
                 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
                 initial={{ opacity: 0 }}
@@ -98,7 +107,8 @@ export default function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href}
-                title={collapsed ? item.label : undefined}
+                onClick={onNavigate}
+                title={isCollapsed ? item.label : undefined}
                 className={cn(
                   'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors',
                   active
@@ -108,7 +118,7 @@ export default function Sidebar() {
               >
                 <item.icon className="h-4 w-4 shrink-0" />
                 <AnimatePresence initial={false}>
-                  {!collapsed && (
+                  {!isCollapsed && (
                     <motion.span
                       className="truncate flex-1"
                       initial={{ opacity: 0 }}
@@ -120,7 +130,7 @@ export default function Sidebar() {
                     </motion.span>
                   )}
                 </AnimatePresence>
-                {!collapsed && item.badge && (
+                {!isCollapsed && item.badge && (
                   <span className="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground">
                     {item.badge}
                   </span>
@@ -135,17 +145,17 @@ export default function Sidebar() {
         <button
           type="button"
           onClick={handleLogout}
-          title={collapsed ? 'Sign out' : 'Click to sign out'}
+          title={isCollapsed ? 'Sign out' : 'Click to sign out'}
           className={cn(
             'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground',
-            collapsed && 'justify-center'
+            isCollapsed && 'justify-center'
           )}
         >
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/20 text-xs font-semibold text-primary">
             {initials}
           </div>
           <AnimatePresence initial={false}>
-            {!collapsed && (
+            {!isCollapsed && (
               <motion.div
                 className="min-w-0 flex-1 text-left"
                 initial={{ opacity: 0, width: 0 }}
@@ -162,22 +172,24 @@ export default function Sidebar() {
               </motion.div>
             )}
           </AnimatePresence>
-          {!collapsed && <LogOut className="h-4 w-4 shrink-0 opacity-50" />}
+          {!isCollapsed && <LogOut className="h-4 w-4 shrink-0 opacity-50" />}
         </button>
       </div>
 
-      <button
-        type="button"
-        onClick={() => setCollapsed((c) => !c)}
-        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        className="absolute -right-px top-1/2 z-10 flex h-14 w-4 -translate-y-1/2 items-center justify-center rounded-l-md border border-l-0 border-border bg-card text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
-      >
-        {collapsed ? (
-          <PanelLeftOpen className="h-3.5 w-3.5" strokeWidth={2.25} />
-        ) : (
-          <PanelLeftClose className="h-3.5 w-3.5" strokeWidth={2.25} />
-        )}
-      </button>
+      {showCollapseToggle && (
+        <button
+          type="button"
+          onClick={() => setCollapsed((c) => !c)}
+          aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          className="absolute -right-px top-1/2 z-10 flex h-14 w-4 -translate-y-1/2 items-center justify-center rounded-l-md border border-l-0 border-border bg-card text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+        >
+          {isCollapsed ? (
+            <PanelLeftOpen className="h-3.5 w-3.5" strokeWidth={2.25} />
+          ) : (
+            <PanelLeftClose className="h-3.5 w-3.5" strokeWidth={2.25} />
+          )}
+        </button>
+      )}
     </motion.aside>
   );
 }

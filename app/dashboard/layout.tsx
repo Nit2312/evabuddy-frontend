@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import Sidebar from '@/components/layout/Sidebar';
@@ -10,12 +10,22 @@ import { Skeleton } from '@/components/ui/skeleton';
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
       router.push('/login');
     }
   }, [user, loading, router]);
+
+  useEffect(() => {
+    if (!mobileSidebarOpen) return;
+    const original = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = original;
+    };
+  }, [mobileSidebarOpen]);
 
   if (loading) {
     return (
@@ -31,11 +41,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar />
+      <Sidebar className="hidden md:flex" />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <Navbar />
+        <Navbar onOpenMobileSidebar={() => setMobileSidebarOpen(true)} />
         <main className="flex-1 overflow-auto">{children}</main>
       </div>
+      {mobileSidebarOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/50"
+            aria-label="Close navigation menu"
+            onClick={() => setMobileSidebarOpen(false)}
+          />
+          <Sidebar
+            className="relative z-10 h-full w-[82vw] max-w-[280px]"
+            onNavigate={() => setMobileSidebarOpen(false)}
+            showCollapseToggle={false}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -51,7 +51,7 @@ export default function SettingsPage() {
           <CardDescription>Update your display name and view account info.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
             <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/20 text-xl font-semibold text-primary">
               {initials}
             </div>
@@ -114,7 +114,7 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-3">
             <div>
               <p className="text-sm font-medium">UID</p>
-              <p className="font-mono text-xs text-muted-foreground">{user?.uid}</p>
+              <p className="break-all font-mono text-xs text-muted-foreground">{user?.uid}</p>
             </div>
           </div>
         </CardContent>

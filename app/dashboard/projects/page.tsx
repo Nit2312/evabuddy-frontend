@@ -102,7 +102,7 @@ export default function ProjectsPage() {
 
   return (
     <div className="space-y-6 p-4 md:p-6 lg:p-8">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">
           {['all', ...statusOptions].map((s) => (
             <Button
@@ -115,7 +115,7 @@ export default function ProjectsPage() {
             </Button>
           ))}
         </div>
-        <Button onClick={openCreate}>+ New Project</Button>
+        <Button onClick={openCreate} className="w-full sm:w-auto">+ New Project</Button>
       </div>
 
       {filtered.length === 0 ? (
@@ -248,9 +248,9 @@ export default function ProjectsPage() {
               </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={closeModal}>Cancel</Button>
-            <Button onClick={handleSave} disabled={saving || !form.name.trim()}>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={closeModal} className="w-full sm:w-auto">Cancel</Button>
+            <Button onClick={handleSave} disabled={saving || !form.name.trim()} className="w-full sm:w-auto">
               {saving ? 'Saving...' : modal.editing ? 'Save Changes' : 'Create Project'}
             </Button>
           </DialogFooter>

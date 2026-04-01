@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, Settings, LogOut } from 'lucide-react';
+import { ChevronDown, Settings, LogOut, Menu } from 'lucide-react';
 
 const pathTitles: Record<string, string> = {
   '/dashboard': 'Dashboard',
@@ -28,7 +28,11 @@ function getPageTitle(pathname: string): string {
   return 'Dashboard';
 }
 
-export function Navbar() {
+interface NavbarProps {
+  onOpenMobileSidebar?: () => void;
+}
+
+export function Navbar({ onOpenMobileSidebar }: NavbarProps) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const title = getPageTitle(pathname ?? '');
@@ -41,10 +45,21 @@ export function Navbar() {
     .slice(0, 2);
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border bg-background px-4 md:px-6">
-      <h1 className="truncate text-lg font-semibold tracking-tight">
-        {title}
-      </h1>
+    <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border bg-background px-3 sm:px-4 md:px-6">
+      <div className="flex min-w-0 items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="md:hidden"
+          onClick={onOpenMobileSidebar}
+          aria-label="Open navigation menu"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+        <h1 className="truncate text-base font-semibold tracking-tight sm:text-lg">
+          {title}
+        </h1>
+      </div>
       <div className="flex shrink-0 items-center gap-2">
         <ThemeToggle />
         <DropdownMenu>

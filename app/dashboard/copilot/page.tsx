@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useAuth } from '@/context/AuthContext';
-import { api, Source, RetrievalMetrics } from '@/lib/api';
+import { api, Source } from '@/lib/api';
 import {
   ChatMessage,
   ChatSession,
@@ -36,12 +36,14 @@ function CopilotInner() {
   const [showReadyToast, setShowReadyToast] = useState(false);
   const [openSources, setOpenSources] = useState<string | null>(null);
   const [sessionsPanelCollapsed, setSessionsPanelCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hasSentMessage = useRef(false);
   const previousBackendStatus = useRef<'connecting' | 'initializing' | 'online' | 'offline'>('connecting');
 
   const isBackendReady = backendStatus === 'online';
+  const mobileHistoryOpen = isMobile && !sessionsPanelCollapsed;
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
@@ -108,6 +110,17 @@ function CopilotInner() {
     ta.style.height = Math.min(ta.scrollHeight, 160) + 'px';
   }, [input]);
 
+  useEffect(() => {
+    const updateViewport = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile) setSessionsPanelCollapsed(true);
+    };
+    updateViewport();
+    window.addEventListener('resize', updateViewport);
+    return () => window.removeEventListener('resize', updateViewport);
+  }, []);
+
   const startNewSession = async () => {
     if (!user) return;
     hasSentMessage.current = false;
@@ -118,6 +131,7 @@ function CopilotInner() {
   const selectSession = (id: string) => {
     hasSentMessage.current = false;
     setActiveSessionId(id);
+    if (isMobile) setSessionsPanelCollapsed(true);
   };
 
   const handleDeleteSession = async (e: React.MouseEvent, id: string) => {
@@ -193,9 +207,17 @@ function CopilotInner() {
       </AnimatePresence>
 
       <div className="flex min-h-0 flex-1">
+        {mobileHistoryOpen && (
+          <button
+            type="button"
+            className="absolute inset-0 z-10 bg-black/40"
+            aria-label="Close history"
+            onClick={() => setSessionsPanelCollapsed(true)}
+          />
+        )}
         <motion.aside
           className={cn(
-            'flex shrink-0 flex-col border-r border-border bg-card overflow-hidden relative',
+            'hidden md:flex shrink-0 flex-col border-r border-border bg-card overflow-hidden relative',
             sessionsPanelCollapsed ? 'w-10 min-w-[2.5rem]' : 'w-64 min-w-[16rem]'
           )}
           initial={false}
@@ -269,14 +291,99 @@ function CopilotInner() {
             )}
           </button>
         </motion.aside>
+        <AnimatePresence>
+          {mobileHistoryOpen && (
+            <motion.aside
+              initial={{ x: -320, opacity: 0.9 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: -320, opacity: 0.9 }}
+              transition={{ type: 'spring', stiffness: 330, damping: 32 }}
+              className="absolute inset-y-0 left-0 z-20 flex w-[86vw] max-w-[320px] flex-col border-r border-border bg-card shadow-xl md:hidden"
+            >
+              <div className="flex items-center justify-between border-b border-border px-3 py-3">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  History
+                </span>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="icon-sm" onClick={startNewSession} title="New chat" aria-label="New chat">
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => setSessionsPanelCollapsed(true)}
+                    title="Close history"
+                    aria-label="Close history"
+                  >
+                    <PanelLeftClose className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto p-2">
+                {sessions.length === 0 ? (
+                  <p className="px-2 py-4 text-center text-sm text-muted-foreground">
+                    No sessions yet. Start a new chat!
+                  </p>
+                ) : (
+                  <ul className="space-y-0.5">
+                    {sessions.map((s) => (
+                      <li key={s.id}>
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => selectSession(s.id)}
+                          onKeyDown={(e) => e.key === 'Enter' && selectSession(s.id)}
+                          className={cn(
+                            'flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-sm transition-colors hover:bg-muted',
+                            activeSessionId === s.id && 'bg-primary/10 text-primary'
+                          )}
+                        >
+                          <MessageSquare className="h-4 w-4 shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-medium">{s.title || 'Untitled'}</p>
+                            <p className="text-xs text-muted-foreground">{s.messageCount ?? 0} messages</p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="shrink-0 opacity-60 hover:opacity-100"
+                            onClick={(e) => handleDeleteSession(e, s.id)}
+                            title="Delete"
+                            aria-label="Delete session"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </motion.aside>
+          )}
+        </AnimatePresence>
 
         <div className="flex min-w-0 flex-1 flex-col">
           <div
             className={cn(
               'flex-1 overflow-y-auto transition-[padding] duration-200',
-              sessionsPanelCollapsed ? 'px-1 py-2 md:px-2 md:py-3' : 'p-4 md:p-6'
+              sessionsPanelCollapsed ? 'px-2 py-2 md:px-2 md:py-3' : 'p-3 sm:p-4 md:p-6'
             )}
           >
+            {isMobile && (
+              <div className="mb-3 flex justify-start">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 rounded-full px-3"
+                  onClick={() => setSessionsPanelCollapsed(false)}
+                  aria-label="Open chat history"
+                >
+                  <PanelLeftOpen className="mr-1.5 h-4 w-4" />
+                  History
+                </Button>
+              </div>
+            )}
             {!hasSentMessage.current && messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <motion.div
@@ -396,7 +503,6 @@ function MessageBubble({
   userInitials: string;
 }) {
   const sources = (msg.sources as Source[]) || [];
-  const metrics = msg.metrics as RetrievalMetrics | null;
   const isOpen = openSources === msg.id;
 
   return (
