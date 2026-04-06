@@ -34,6 +34,8 @@ type EvalResponse = {
 
 type StatusResponse = {
     initialized: boolean;
+    init_pending?: boolean;
+    init_error?: string | null;
     total_cases: number;
     total_chunks: number;
     model: string;
@@ -82,16 +84,28 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
     return res.json();
 }
 
+export type HealthResponse = {
+    status: string;
+    initialized: boolean;
+    /** True while background RAG startup has not finished */
+    init_pending?: boolean;
+    /** Set when startup finished but RAG failed to load (e.g. missing env) */
+    init_error?: string | null;
+};
+
 export const api = {
     /** Check if the backend is reachable */
-    health: () => apiFetch<{ status: string; initialized: boolean }>('/api/health'),
+    health: () => apiFetch<HealthResponse>('/api/health'),
 
     /** Get full RAG system status */
     status: () => apiFetch<StatusResponse>('/api/status'),
 
     /** Trigger RAG initialization */
     initialize: () =>
-        apiFetch<{ success: boolean; message: string }>('/api/initialize', { method: 'POST' }),
+        apiFetch<{ success: boolean; message: string; total_cases?: number; total_chunks?: number }>(
+            '/api/initialize',
+            { method: 'POST' },
+        ),
 
     /** Send a chat message */
     chat: async (message: string, userId?: string, sessionId?: string) => {

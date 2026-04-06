@@ -32,7 +32,11 @@ function CopilotInner() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
-  const [backendStatus, setBackendStatus] = useState<'connecting' | 'initializing' | 'online' | 'offline'>('connecting');
+  const [backendStatus, setBackendStatus] = useState<
+    'connecting' | 'initializing' | 'online' | 'offline' | 'init_failed'
+  >('connecting');
+  const [initErrorDetail, setInitErrorDetail] = useState<string | null>(null);
+  const [initRetrying, setInitRetrying] = useState(false);
   const [showReadyToast, setShowReadyToast] = useState(false);
   const [openSources, setOpenSources] = useState<string | null>(null);
   const [sessionsPanelCollapsed, setSessionsPanelCollapsed] = useState(false);
@@ -40,7 +44,9 @@ function CopilotInner() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hasSentMessage = useRef(false);
-  const previousBackendStatus = useRef<'connecting' | 'initializing' | 'online' | 'offline'>('connecting');
+  const previousBackendStatus = useRef<
+    'connecting' | 'initializing' | 'online' | 'offline' | 'init_failed'
+  >('connecting');
 
   const isBackendReady = backendStatus === 'online';
   const mobileHistoryOpen = isMobile && !sessionsPanelCollapsed;
@@ -72,7 +78,19 @@ function CopilotInner() {
       try {
         const health = await api.health();
         if (cancelled) return;
-        setBackendStatus(health.initialized ? 'online' : 'initializing');
+        if (health.initialized) {
+          setBackendStatus('online');
+          setInitErrorDetail(null);
+        } else if (health.init_error) {
+          setBackendStatus('init_failed');
+          setInitErrorDetail(health.init_error);
+        } else if (health.init_pending) {
+          setBackendStatus('initializing');
+          setInitErrorDetail(null);
+        } else {
+          setBackendStatus('initializing');
+          setInitErrorDetail(null);
+        }
       } catch {
         if (!cancelled) setBackendStatus('offline');
       }
@@ -175,6 +193,24 @@ function CopilotInner() {
     }
   };
 
+  const handleRetryInit = async () => {
+    if (initRetrying) return;
+    setInitRetrying(true);
+    try {
+      const res = await api.initialize();
+      if (res.success) {
+        setBackendStatus('online');
+        setInitErrorDetail(null);
+      } else {
+        setInitErrorDetail(res.message || 'Initialization failed');
+      }
+    } catch (e) {
+      setInitErrorDetail(e instanceof Error ? e.message : 'Request failed');
+    } finally {
+      setInitRetrying(false);
+    }
+  };
+
   const suggestions = [
     'What are the steps for MH2000 to MH3000 hardware conversion?',
     'How do I set up the high speed counter?',
@@ -191,8 +227,13 @@ function CopilotInner() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             className={cn(
-              'pointer-events-none absolute right-4 top-4 z-30 rounded-lg border px-3 py-2 text-xs font-medium shadow-md backdrop-blur',
+              'absolute right-4 top-4 z-30 rounded-lg border text-xs font-medium shadow-md backdrop-blur',
+              backendStatus === 'init_failed'
+                ? 'pointer-events-auto max-w-[min(100vw-2rem,22rem)] px-3 py-3'
+                : 'pointer-events-none px-3 py-2',
               backendStatus === 'offline' && 'border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-300',
+              backendStatus === 'init_failed' &&
+                'border-red-500/30 bg-red-500/10 text-red-800 dark:text-red-200',
               (backendStatus === 'connecting' || backendStatus === 'initializing') &&
                 'border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300',
               backendStatus === 'online' && 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
@@ -201,6 +242,25 @@ function CopilotInner() {
             {backendStatus === 'connecting' && 'Connecting to backend...'}
             {backendStatus === 'initializing' && 'System is initializing. Please wait...'}
             {backendStatus === 'offline' && 'Backend is offline. Retrying connection...'}
+            {backendStatus === 'init_failed' && (
+              <div className="flex flex-col gap-2">
+                <p className="font-semibold">System failed to initialize</p>
+                <p className="line-clamp-6 break-words font-normal opacity-95">
+                  {initErrorDetail ||
+                    'Check Render logs and env vars: HF_TOKEN, ASTRA_DB_*, GROQ_API_KEY.'}
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  disabled={initRetrying}
+                  onClick={handleRetryInit}
+                  className="self-start"
+                >
+                  {initRetrying ? 'Retrying…' : 'Retry initialization'}
+                </Button>
+              </div>
+            )}
             {backendStatus === 'online' && 'System is live. You can ask questions now.'}
           </motion.div>
         )}
@@ -462,7 +522,9 @@ function CopilotInner() {
                 placeholder={
                   isBackendReady
                     ? 'Ask anything about elevator procedures...'
-                    : 'System is initializing. Query input is disabled until backend is live.'
+                    : backendStatus === 'init_failed'
+                      ? 'Fix backend env or use Retry above. Input stays disabled until the system is live.'
+                      : 'System is initializing. Query input is disabled until backend is live.'
                 }
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
